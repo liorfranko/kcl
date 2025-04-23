@@ -105,4 +105,40 @@ fn get_missing_attrs(assign_stmt: &AssignStmt, required_attrs: &[String]) -> Vec
     } else {
         Vec::new()
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kclvm_parser::parse_program;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_schema_validation() {
+        let test_file = PathBuf::from("src/test_data/schema_validation/validator_test.k");
+        let program = parse_program(&[test_file.clone()], None).unwrap();
+        let scope = ProgramScope::new(&program);
+        
+        let result = validate_schema_attributes(&program, &scope);
+        assert!(result.is_err(), "Expected validation errors");
+        
+        let diagnostics = result.unwrap_err();
+        assert_eq!(diagnostics.len(), 2, "Expected 2 validation errors");
+        
+        // Sort diagnostics by line number for consistent testing
+        let mut sorted_diagnostics = diagnostics;
+        sorted_diagnostics.sort_by_key(|d| d.range.0.line);
+        
+        // Test case 2: missing age
+        let error1 = &sorted_diagnostics[0];
+        assert_eq!(error1.level, Level::Error);
+        assert!(error1.message.contains("Missing required attributes in Person instance: age"));
+        assert_eq!(error1.range.0.line, 20);
+        
+        // Test case 3: missing name
+        let error2 = &sorted_diagnostics[1];
+        assert_eq!(error2.level, Level::Error);
+        assert!(error2.message.contains("Missing required attributes in Person instance: name"));
+        assert_eq!(error2.range.0.line, 26);
+    }
 } 
